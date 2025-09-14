@@ -391,7 +391,6 @@
             let quantity = parseFloat($(this).find('.quantity').val()) || 0;
             let price = parseFloat($(this).find('.price').val()) || 0;
             let discount = parseFloat($(this).find('.discount').val()) || 0;
-
             let itemTotalBeforeTax = (quantity * price) - discount;
             let itemTaxRate = parseFloat($(this).find('.itemTaxRate').val()) || 0;
             let itemTaxPrice = (itemTotalBeforeTax * itemTaxRate) / 100;
@@ -425,6 +424,10 @@
         var url = $(this).data('url');
         var el = $(this);
 
+        if (!iteams_id) {
+            return;
+        }
+
         $.ajax({
             url: url,
             type: 'POST',
@@ -446,7 +449,7 @@
                 var tax = [];
                 var totalItemTaxRate = 0;
 
-                if (item.taxes == 0) {
+                if (item.taxes.length === 0) {
                     taxes += '-';
                 } else {
                     for (var i = 0; i < item.taxes.length; i++) {
@@ -456,26 +459,26 @@
                         totalItemTaxRate += parseFloat(item.taxes[i].rate);
                     }
                 }
-                var itemTaxPrice = parseFloat((totalItemTaxRate / 100)) * parseFloat((item.product.sale_price * 1));
-                row.find('.itemTaxPrice').val(itemTaxPrice.toFixed(2));
+
+                row.find('.itemTaxPrice').val(0); // Clear previous tax price
                 row.find('.itemTaxRate').val(totalItemTaxRate.toFixed(2));
                 row.find('.taxes').html(taxes);
-                row.find('.tax').val(tax);
+                row.find('.tax').val(tax.join(','));
                 row.find('.unit').html(item.unit);
                 row.find('.discount').val(0);
-
-                // Calculate amount including tax
-                var quantity = 1;
-                var price = parseFloat(item.product.sale_price);
-                var discount = 0;
-                var amountBeforeTax = (quantity * price) - discount;
-                var amountWithTax = amountBeforeTax + itemTaxPrice;
-                row.find('.amount').val(amountWithTax.toFixed(2));
 
                 // Trigger calculation for this row
                 row.find('.price').trigger('change');
             },
         });
+
+        // ✨ --- START: NEW CODE TO ADD ROW AUTOMATICALLY --- ✨
+        var $currentRow = $(this).closest('tr[data-repeater-item]');
+        var $lastRow = $('tbody[data-repeater-list="items"] tr[data-repeater-item]:last');
+        if ($currentRow.is($lastRow)) {
+            $('[data-repeater-create]').click();
+        }
+        // ✨ --- END: NEW CODE TO ADD ROW AUTOMATICALLY --- ✨
     });
 
     // Repeater delete handler
@@ -487,10 +490,14 @@
 
     // Initial setup
     $(document).ready(function() {
-        JsSearchBox();
+        if (typeof JsSearchBox !== 'undefined') {
+            JsSearchBox();
+        }
         updateGrandTotals();
     });
 </script>
+
+
 @endpush
 @section('content')
 <div class="row">
@@ -665,13 +672,23 @@
                                     </div>
                                 </td>
                             </tr>
-                            <tr>
+                            <!-- <tr>
                                 <td colspan="2">
                                     <div class="form-group">
                                         {{ Form::textarea('description', null, ['class' => 'form-control pro_description', 'rows' => '3', 'placeholder' => __('Description')]) }}
                                     </div>
                                 </td>
                                 <td colspan="5"></td>
+                            </tr> -->
+                            <tr>
+                                <thead>
+                                    <th>
+                                        <h6 class="h6 d-inline-block font-weight-400 mb-4">{{ __('Payment Type') }}</h6>
+                                    </th>
+                                    <th>
+                                        <h6 class="h6 d-inline-block font-weight-400 mb-4">{{ __('Amount') }}</h6>
+                                    </th>
+                                </thead>
                             </tr>
                         </tbody>
                         <tfoot>
