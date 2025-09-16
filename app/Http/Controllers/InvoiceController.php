@@ -221,7 +221,10 @@ class InvoiceController extends Controller
                 }
             }
 
-            return redirect()->route('invoice.index', $invoice->id)->with('success', __('Invoice successfully created.'));
+            //return redirect()->route('invoice.index', $invoice->id)->with('success', __('Invoice successfully created.'));
+
+            return redirect()->route('invoice.show', Crypt::encrypt($invoice->id))
+                ->with('success', __('Invoice successfully created.'));
         } else {
             return redirect()->back()->with('error', __('Permission denied.'));
         }

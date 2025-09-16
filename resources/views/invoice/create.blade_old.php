@@ -6,7 +6,7 @@
 <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a></li>
 <li class="breadcrumb-item"><a href="{{ route('invoice.index') }}">{{ __('Invoice') }}</a></li>
 @endsection
-@push('script-page')
+<!-- @push('script-page')
 <script src="{{ asset('js/jquery-ui.min.js') }}"></script>
 <script src="{{ asset('js/jquery.repeater.min.js') }}"></script>
 <script src="{{ asset('js/jquery-searchbox.js') }}"></script>
@@ -345,6 +345,12 @@
     JsSearchBox();
 </script>
 
+@endpush -->
+
+@push('script-page')
+<script src="{{ asset('js/jquery-ui.min.js') }}"></script>
+<script src="{{ asset('js/jquery.repeater.min.js') }}"></script>
+<script src="{{ asset('js/jquery-searchbox.js') }}"></script>
 <script>
     // Main Calculation Function
     function calculateRowTotals(changedElement) {
@@ -356,6 +362,7 @@
         let priceInput = row.find('.price');
         let itemTaxRate = parseFloat(row.find('.itemTaxRate').val()) || 0;
 
+        // If the Amount field was changed, do a "reverse" calculation to find the price
         if ($(changedElement).hasClass('amount')) {
             let amount = parseFloat(amountInput.val()) || 0;
             if (quantity > 0) {
@@ -370,6 +377,7 @@
             row.find('.itemTaxPrice').val(itemTaxPrice.toFixed(2));
         }
 
+        // Always update grand totals after any row change
         updateGrandTotals();
     }
 
@@ -383,6 +391,7 @@
             let quantity = parseFloat($(this).find('.quantity').val()) || 0;
             let price = parseFloat($(this).find('.price').val()) || 0;
             let discount = parseFloat($(this).find('.discount').val()) || 0;
+
             let itemTotalBeforeTax = (quantity * price) - discount;
             let itemTaxRate = parseFloat($(this).find('.itemTaxRate').val()) || 0;
             let itemTaxPrice = (itemTotalBeforeTax * itemTaxRate) / 100;
@@ -398,42 +407,23 @@
         $('.totalDiscount').text(totalDiscount.toFixed(2));
         $('.totalTax').text(totalTax.toFixed(2));
         $('.totalAmount').text(totalAmount.toFixed(2));
-
-        updateDueAmount(); // ✨ Update Due amount whenever total changes
     }
 
-    // ✨ --- START: NEW DUE AMOUNT FUNCTION --- ✨
-    function updateDueAmount() {
-        var totalAmount = parseFloat($('.totalAmount').text()) || 0;
-        var receivedAmount = parseFloat($('#received-amount-display').text()) || 0;
-        var dueAmount = totalAmount - receivedAmount;
-
-        $('#due-amount-display').text(dueAmount.toFixed(2));
-    }
-    // ✨ --- END: NEW DUE AMOUNT FUNCTION --- ✨
-
-
-    // Event Handlers for Invoice Items
+    // Event Handlers
     $(document).on('keyup change', '.quantity, .price, .discount, .itemTax', function() {
         calculateRowTotals(this);
     });
     $(document).on('keyup change', '.amount', function(e) {
-        // Make sure this is for invoice items and not payment items
-        if (e.originalEvent && $(this).closest('#payment-container').length === 0) {
+        if (e.originalEvent) {
             calculateRowTotals(this);
         }
     });
 
-    // AJAX item selection and other logic...
+    // AJAX item selection
     $(document).on('change', '.item', function() {
-        // ... (your existing AJAX and repeater logic remains here) ...
         var iteams_id = $(this).val();
         var url = $(this).data('url');
         var el = $(this);
-
-        if (!iteams_id) {
-            return;
-        }
 
         $.ajax({
             url: url,
@@ -456,115 +446,49 @@
                 var tax = [];
                 var totalItemTaxRate = 0;
 
-                if (item.taxes.length === 0) {
+                if (item.taxes == 0) {
                     taxes += '-';
                 } else {
                     for (var i = 0; i < item.taxes.length; i++) {
-                        taxes += '<span class="badge bg-primary mt-1 mr-2">' + item.taxes[i].name + ' ' + '(' + item.taxes[i].rate + '%)' + '</span>';
+                        taxes += '<span class="badge bg-primary mt-1 mr-2">' + item.taxes[i].name +
+                            ' ' + '(' + item.taxes[i].rate + '%)' + '</span>';
                         tax.push(item.taxes[i].id);
                         totalItemTaxRate += parseFloat(item.taxes[i].rate);
                     }
                 }
-
-                row.find('.itemTaxPrice').val(0);
+                var itemTaxPrice = parseFloat((totalItemTaxRate / 100)) * parseFloat((item.product.sale_price * 1));
+                row.find('.itemTaxPrice').val(itemTaxPrice.toFixed(2));
                 row.find('.itemTaxRate').val(totalItemTaxRate.toFixed(2));
                 row.find('.taxes').html(taxes);
-                row.find('.tax').val(tax.join(','));
+                row.find('.tax').val(tax);
                 row.find('.unit').html(item.unit);
                 row.find('.discount').val(0);
+
+                // Calculate amount including tax
+                var quantity = 1;
+                var price = parseFloat(item.product.sale_price);
+                var discount = 0;
+                var amountBeforeTax = (quantity * price) - discount;
+                var amountWithTax = amountBeforeTax + itemTaxPrice;
+                row.find('.amount').val(amountWithTax.toFixed(2));
+
+                // Trigger calculation for this row
                 row.find('.price').trigger('change');
             },
         });
-
-        var $currentRow = $(this).closest('tr[data-repeater-item]');
-        var $lastRow = $('tbody[data-repeater-list="items"] tr[data-repeater-item]:last');
-        if ($currentRow.is($lastRow)) {
-            $('[data-repeater-create]').click();
-        }
     });
 
+    // Repeater delete handler
     $(document).on('click', '[data-repeater-delete]', function() {
         setTimeout(function() {
             updateGrandTotals();
-        }, 100);
+        }, 100); // Wait for row to be removed
     });
 
+    // Initial setup
     $(document).ready(function() {
-        if (typeof JsSearchBox !== 'undefined') {
-            JsSearchBox();
-        }
+        JsSearchBox();
         updateGrandTotals();
-    });
-</script>
-
-
-// --- SCRIPT FOR PAYMENT TYPE LOGIC ---
-<script>
-    $(document).ready(function() {
-
-        function updatePaymentTotals() {
-            var totalPaid = 0;
-            // BEFORE: $('#payment-container .amount').each(function() {
-            // AFTER: Use the new unique class name
-            $('#payment-container .payment_amount').each(function() {
-                var amount = parseFloat($(this).val()) || 0;
-                totalPaid += amount;
-            });
-            $('#total-payment-display').text(totalPaid.toFixed(2));
-            $('#received-amount-display').text(totalPaid.toFixed(2));
-
-            updateDueAmount();
-        }
-
-        function updatePaymentOptions() {
-            var selectedValues = [];
-            $('#payment-container select').each(function() {
-                var value = $(this).val();
-                if (value) {
-                    selectedValues.push(value);
-                }
-            });
-
-            $('#payment-container select').each(function() {
-                var myValue = $(this).val();
-                $(this).find('option').each(function() {
-                    var optionValue = $(this).val();
-                    if (selectedValues.includes(optionValue) && optionValue !== myValue) {
-                        // THIS LINE IS THE FIX
-                        $(this).hide(); // Use hide() instead of prop('disabled', true)
-                    } else {
-                        // THIS LINE IS THE FIX
-                        $(this).show(); // Use show() instead of prop('disabled', false)
-                    }
-                });
-            });
-        }
-
-        $('#add-payment-row').on('click', function(e) {
-            e.preventDefault();
-            var newRow = $('#payment-row-template').html();
-            $('#payment-container').append(newRow);
-            updatePaymentOptions();
-            updatePaymentTotals();
-        });
-
-        $('#payment-container').on('click', '.remove-payment-row', function(e) {
-            e.preventDefault();
-            $(this).closest('.payment-row').remove();
-            updatePaymentOptions();
-            updatePaymentTotals();
-        });
-
-        $('#payment-container').on('change', 'select', function() {
-            updatePaymentOptions();
-        });
-
-        $('#payment-container').on('keyup change', '.payment_amount', function() {
-            updatePaymentTotals();
-        });
-
-        updatePaymentOptions();
-        updatePaymentTotals();
     });
 </script>
 @endpush
@@ -698,7 +622,8 @@
                                 <td>
                                     <div class="form-group price-input input-group search-form flex-nowrap">
                                         {{ Form::number('price', '', ['class' => 'form-control price', 'step' => '0.01', 'required' => 'required', 'placeholder' => __('Price'), 'required' => 'required']) }}
-                                        <span class="input-group-text bg-transparent">{{ \Auth::user()->currencySymbol() }}</span>
+                                        <span
+                                            class="input-group-text bg-transparent">{{ \Auth::user()->currencySymbol() }}</span>
                                     </div>
                                 </td>
 
@@ -727,7 +652,7 @@
 
                                 <td>
                                     <div class="form-group price-input input-group search-form flex-nowrap">
-                                        {{ Form::number('amount', '', ['class' => 'form-control amount', 'step' => '0.01', 'required' => 'required', 'placeholder' => __('Amount')]) }}
+                                        {{ Form::number('amount', '', ['class' => 'form-control amount', 'required' => 'required', 'placeholder' => __('Amount'), 'step' => '0.01']) }}
                                         <span class="input-group-text bg-transparent">{{ \Auth::user()->currencySymbol() }}</span>
                                     </div>
                                 </td>
@@ -740,105 +665,27 @@
                                     </div>
                                 </td>
                             </tr>
-                            <!-- <tr>
+                            <tr>
                                 <td colspan="2">
                                     <div class="form-group">
                                         {{ Form::textarea('description', null, ['class' => 'form-control pro_description', 'rows' => '3', 'placeholder' => __('Description')]) }}
                                     </div>
                                 </td>
                                 <td colspan="5"></td>
-                            </tr> -->
-
+                            </tr>
                         </tbody>
-                        </br>
-
-                        <!-- Payment Type -->
-                        <table class="table table-striped">
-                            <tr>
-                                {{-- Payment Section --}}
-                                <div class="col-5 mb-3 mt-3 ml-3" style="margin-left: 22px;">
-                                    <div class="card border shadow-none">
-                                        <div class="card-header">
-                                            <h5 class="h5">{{ __('Payments Type') }}</h5>
-                                        </div>
-                                        <div class="card-body">
-                                            <div id="payment-container">
-                                                {{-- First Payment Row (Static) --}}
-                                                <div class="row align-items-center mb-2">
-                                                    <div class="col-md-5">
-                                                        <select name="payment_type[]" class="form-select" id="first-payment-type">
-                                                            <option value="Cash">{{ __('Cash') }}</option>
-                                                            <option value="Check">{{ __('Check') }}</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-5">
-                                                        <div class="input-group">
-                                                            {{ Form::number('payment_amount[]', '', ['class' => 'form-control payment_amount', 'step' => '0.01', 'placeholder' => __('00.00')]) }}
-                                                            <span class="input-group-text bg-transparent">{{ \Auth::user()->currencySymbol() }}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <a href="#" id="add-payment-row" class="btn btn-sm btn-primary mt-2">{{ __('+ Add Another Payment') }}</a>
-                                            <div class="col-md-5 mt-3">
-                                                <span>
-                                                    Total Payment = <span id="total-payment-display">0.00</span> ({{ \Auth::user()->currencySymbol() }})
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                            </tr>
-                            <tr>
-                                <div id="payment-row-template" style="display: none;">
-                                    <div class="row align-items-center mb-2 payment-row">
-                                        <div class="col-md-5">
-                                            <select name="payment_type[]" class="form-select">
-                                                <option value="Cash">{{ __('Cash') }}</option>
-                                                <option value="Check">{{ __('Check') }}</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-5">
-                                            <div class="input-group">
-                                                <input class="form-control payment_amount" step="0.01" placeholder="{{ __('00.00') }}" name="payment_amount[]" type="number">
-                                                <span class="input-group-text bg-transparent">{{ \Auth::user()->currencySymbol() }}</span>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <button type="button" class="btn btn-danger btn-sm remove-payment-row"><i class="ti ti-trash text-white"></i></button>
-
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </tr>
-                        </table>
-                    </table>
-                    <table class="table mb-0 table-custom-style">
                         <tfoot>
                             <tr>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
                                 <td></td>
-                                <td width="50px"><strong>{{ __('Sub Total') }} ({{ \Auth::user()->currencySymbol() }})</strong>
+                                <td><strong>{{ __('Sub Total') }} ({{ \Auth::user()->currencySymbol() }})</strong>
                                 </td>
                                 <td class="text-end subTotal">0.00</td>
                                 <td></td>
                             </tr>
                             <tr>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
@@ -851,62 +698,19 @@
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
                                 <td></td>
                                 <td><strong>{{ __('Tax') }} ({{ \Auth::user()->currencySymbol() }})</strong></td>
                                 <td class="text-end totalTax">0.00</td>
                                 <td></td>
                             </tr>
-
                             <tr>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
                                 <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td></td>
                                 <td class="blue-text"><strong>{{ __('Total Amount') }}
                                         ({{ \Auth::user()->currencySymbol() }})</strong></td>
                                 <td class="text-end totalAmount blue-text"></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td></td>
-                                <td><strong>{{ __('Received') }} ({{ \Auth::user()->currencySymbol() }})</strong></td>
-                                <td class="text-end" id="received-amount-display">0.00</td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td></td>
-                                <td><strong>{{ __('Due') }} ({{ \Auth::user()->currencySymbol() }})</strong></td>
-                                <td class="text-end" id="due-amount-display">0.00</td>
                                 <td></td>
                             </tr>
                         </tfoot>
@@ -918,11 +722,14 @@
     <div class="modal-footer">
         <input type="button" value="{{ __('Cancel') }}" onclick="location.href = '{{ route('invoice.index') }}';"
             class="btn btn-light me-2">
-        <input type="submit" value="{{ __('Create') }} " class="btn  btn-primary">
+        <input type="submit" value="{{ __('Create') }}" class="btn  btn-primary">
     </div>
     {{ Form::close() }}
 
 </div>
+
+
+
 
 
 @endsection

@@ -95,6 +95,14 @@ $plan = \App\Models\Utility::getChatGPTSettings();
             </div>
         </div>
 
+        <div class="form-group  col-md-3">
+            {{ Form::label('tax_id', __('Tax'), ['class' => 'form-label']) }}<x-required></x-required>
+            {{ Form::select('tax_id[]', $tax, null, ['class' => 'form-control select2', 'id' => 'choices-multiple1', 'multiple' => '', 'required' => 'required']) }}
+            <div class="text-xs mt-1">
+                {{ __('Create tax here.') }} <a href="{{ route('taxes.index') }}"><b>{{ __('Create tax') }}</b></a>
+            </div>
+        </div>
+
         <!-- Product SKU Field -->
         <div class="col-md-3">
             <div class="form-group">

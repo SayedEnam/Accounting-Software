@@ -173,7 +173,7 @@ class ProductServiceController extends Controller
                 'productlocation_id' => 'required',
                 'unit_id' => 'required',
                 'type' => 'required',
-                //'tax_id' => 'required',
+                'tax_id' => 'required',
             ];
 
             $validator = \Validator::make($request->all(), $rules);
@@ -291,7 +291,7 @@ class ProductServiceController extends Controller
                     'sale_price' => 'nullable|numeric', // Make sale_price nullable
                     //'sale_price' => 'required|numeric',
                     'purchase_price' => 'required|numeric',
-                    //'tax_id' => 'required',
+                    'tax_id' => 'required',
                     'category_id' => 'required',
                     'productlocation_id' => 'required',
                     'unit_id' => 'required',
