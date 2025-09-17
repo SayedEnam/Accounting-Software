@@ -25,6 +25,13 @@ class Invoice extends Model
         'Paid',
     ];
 
+    // Payment types
+
+    public static $paymentTypes = [
+        'cash' => 'Cash',
+        'check' => 'Check',
+    ];
+
 
     public function tax()
     {
@@ -43,7 +50,7 @@ class Invoice extends Model
 
     public function bankpayment()
     {
-        return $this->hasMany('App\Models\BankTransfer', 'invoice_id', 'id')->where('type','=','invoice')->where('status','!=','Approved');
+        return $this->hasMany('App\Models\BankTransfer', 'invoice_id', 'id')->where('type', '=', 'invoice')->where('status', '!=', 'Approved');
     }
 
     public function customer()
@@ -64,12 +71,11 @@ class Invoice extends Model
     public function getTotalTax()
     {
         $totalTax = 0;
-        foreach($this->items as $product)
-        {
+        foreach ($this->items as $product) {
             $taxes = Utility::totalTaxRate($product->tax);
 
 
-            $totalTax += ($taxes / 100) * ($product->price * $product->quantity - $product->discount) ;
+            $totalTax += ($taxes / 100) * ($product->price * $product->quantity - $product->discount);
         }
 
         return $totalTax;
@@ -87,7 +93,7 @@ class Invoice extends Model
 
     public function getTotal()
     {
-        return ($this->getSubTotal() -$this->getTotalDiscount()) + $this->getTotalTax();
+        return ($this->getSubTotal() - $this->getTotalDiscount()) + $this->getTotalTax();
     }
 
 
@@ -103,7 +109,7 @@ class Invoice extends Model
 
     public static function change_status($invoice_id, $status)
     {
-        
+
         $invoice         = Invoice::find($invoice_id);
         $invoice->status = $status;
         $invoice->update();
